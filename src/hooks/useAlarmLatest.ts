@@ -37,6 +37,8 @@ export const PAGE_SIZE_OPTIONS = [10, 20, 30, 50];
 
 export function useAlarmLatest() {
   const [rows, setRows] = useState<AlarmRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activePopover, setActivePopover] = useState<number | null>(null);
 
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -46,15 +48,20 @@ export function useAlarmLatest() {
 
   /* ================= FETCH LATEST ================= */
   useEffect(() => {
+  const controller = new AbortController();
+  let inFlight = false;
   const fetchLatest = async () => {
+    if (inFlight) return;
+    inFlight = true;
     try {
       const res = await fetch(
-        `${API_BASE}/api/alarms/latest`
+        `${API_BASE}/api/alarms/latest`, { signal: controller.signal }
       );
 
-      if (!res.ok) return;
+      if (!res.ok) throw new Error(`Latest alarms request failed (${res.status})`);
 
       const data: AlarmApiRow[] = await res.json();
+      if (!Array.isArray(data)) throw new Error("Invalid latest alarms response");
 
       const mapped: AlarmRow[] = data.map((item) => {
         const device = item.device_id;
@@ -111,21 +118,30 @@ export function useAlarmLatest() {
         };
       });
 
-      setRows(mapped);
-      setCurrentPage(1);
+      if (!controller.signal.aborted) {
+        setRows(mapped);
+        setCurrentPage(1);
+        setError(null);
+      }
     } catch (err) {
-      console.error("Error while loading latest alarms:", err);
+      if (!controller.signal.aborted) {
+        setError(err instanceof Error ? err.message : "Unable to load latest alarms");
+      }
+    } finally {
+      inFlight = false;
+      if (!controller.signal.aborted) setLoading(false);
     }
   };
 
   // Fetch immediately when page loads
   fetchLatest();
 
-  // Then refresh every 3 seconds
+  // Refresh every 20 seconds.
   const intervalId = window.setInterval(fetchLatest, 20000);
 
   // Stop polling when component unmounts
   return () => {
+    controller.abort();
     window.clearInterval(intervalId);
   };
 }, []);
@@ -255,6 +271,8 @@ export function useAlarmLatest() {
 
   return {
     rows,
+    loading,
+    error,
     pageRows,
     totalRows,
     totalPages,

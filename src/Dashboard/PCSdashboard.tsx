@@ -18,7 +18,7 @@ const PCSDashboard = () => {
   return (
     <Box
       bg={pageBg}
-      minH="100vh"
+      data-testid="pcs-dashboard"
       w="100%"
       p={3}
     >

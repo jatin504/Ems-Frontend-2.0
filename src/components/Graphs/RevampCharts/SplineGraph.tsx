@@ -365,6 +365,9 @@ const SplineGraph = forwardRef<any, SplineGraphProps>(
             color:
               xAxisProps.labels?.style?.color || axisColor,
             formatter: (value: number) => {
+              if (typeof xAxisProps.labels?.formatter === "function") {
+                return xAxisProps.labels.formatter.call({ value });
+              }
               return echarts.time.format(value, "{HH}:{mm}", true);
             },
           },
