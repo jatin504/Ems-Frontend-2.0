@@ -349,6 +349,14 @@ const EnergyStatus = ({ energy }: { energy: BankData["energy"] }) => {
 
 const BankSummary = () => {
   const border = useColorModeValue("#E5E7EB", "#4A5568");
+  const bankGradient = useColorModeValue(
+    "linear(to-br, #ffffff, #f8fafc)",
+    "linear(to-br, #2c3144, #1f2937)"
+  );
+  const bankShadow = useColorModeValue(
+    "0 8px 22px rgba(15, 23, 42, 0.08)",
+    "0 12px 30px rgba(0, 0, 0, 0.25)"
+  );
 
   const { devices } = useDevices();
 
@@ -436,26 +444,34 @@ const BankSummary = () => {
           minW="0"
         >
           {bankOptions.map(
-            (bank: BankData, index: number) => (
+            (bank: BankData) => (
               <Box
-                key={index}
+                key={bank.device_id}
+                role="link"
+                tabIndex={0}
+                cursor="pointer"
+                onClick={() =>
+                  navigate("/batterybankk", {
+                    state: { currentBank: bank.device_id, breadcrumbSource: "bess" },
+                    replace: true,
+                  })
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") event.currentTarget.click();
+                }}
+                _hover={{ borderColor: "blue.300" }}
+                _focusVisible={{ outline: "2px solid", outlineColor: "blue.400" }}
                 w="100%"
                 maxW="100%"
                 minW="0"
                 overflow="hidden"
-                bgGradient={useColorModeValue(
-                  "linear(to-br, #ffffff, #f8fafc)",
-                  "linear(to-br, #2c3144, #1f2937)"
-                )}
+                bgGradient={bankGradient}
                 borderRadius="18px"
                 border="1px solid"
                 borderColor={border}
                 px={3}
                 py={2}
-                boxShadow={useColorModeValue(
-                  "0 8px 22px rgba(15, 23, 42, 0.08)",
-                  "0 12px 30px rgba(0, 0, 0, 0.25)"
-                )}
+                boxShadow={bankShadow}
               >
                 <HStack
                   align="center"
@@ -481,17 +497,7 @@ const BankSummary = () => {
                       whiteSpace="nowrap"
                       overflow="hidden"
                       textOverflow="ellipsis"
-                      onClick={() =>
-                        navigate("/batterybankk", {
-                          state: {
-                            currentBank:
-                              bank.device_id,
-                            breadcrumbSource:
-                              "bess",
-                          },
-                          replace: true,
-                        })
-                      }
+
                     >
                       {bank.device_id
                         .replace(/^plant_\d+_/, "")
