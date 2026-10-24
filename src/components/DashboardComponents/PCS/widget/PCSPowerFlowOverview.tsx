@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Box,
   Flex,
@@ -7,6 +7,9 @@ import {
   HStack,
   useColorModeValue,
 } from "@chakra-ui/react";
+
+import { useLatestPCSData } from "../../../../hooks/pcs/useLatestPCSData";
+import { useLatestPOIData } from "../../../../hooks/poi_meter/useLatestPOIData";
 
 /* ================= Battery SVG ================= */
 
@@ -355,12 +358,99 @@ const GridIcon = ({ color = "#9BBEFF" }: { color?: string }) => (
   </svg>
 );
 
+/* ================= Helper ================= */
+
+const fmt = (v: number, unit: string) =>
+  Number.isFinite(v) ? `${v.toFixed(2)} ${unit}` : `-- ${unit}`;
+
 /* ================= Component ================= */
 
 const PCSPowerFlowOverview = () => {
   const cardBg = useColorModeValue("#FFFFFF", "#0B2239");
   const cardBorder = useColorModeValue("rgba(15,23,42,.08)", "rgba(255,255,255,.06)");
   const titleColor = useColorModeValue("#0F172A", "white");
+
+  /* ---------- PCS data (Battery + PCS Fleet) ---------- */
+  const pcsKeys = useMemo(() => ["active_power_kw", "soc"], []);
+  const { data: pcsData, status: pcsStatus } = useLatestPCSData(pcsKeys);
+
+  /* ---------- POI / Grid data ---------- */
+  const poiKeys = useMemo(() => ["power_kw", "frequency_hz", "voltage"], []);
+  const { data: poiData, status: poiStatus } = useLatestPOIData(poiKeys);
+
+  /* ---------- derived values ---------- */
+  const {
+    batteryPowerMW,
+    avgSoc,
+    pcsTotalMW,
+    efficiency,
+    gridPowerMW,
+    avgFreqHz,
+    avgVoltKV,
+  } = useMemo(() => {
+    const safeNum = (v: any) => {
+      const n = parseFloat(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    // PCS / Battery
+    let totalActivePowerKW = 0;
+    let totalSoc = 0;
+    let pcsCount = 0;
+
+    if (pcsData && pcsData.length > 0) {
+      for (const row of pcsData) {
+        totalActivePowerKW += safeNum(row.active_power_kw);
+        totalSoc += safeNum(row.soc);
+        pcsCount++;
+      }
+    }
+
+    const batteryPowerMW = totalActivePowerKW / 1000;  // kW -> MW
+    const avgSoc = pcsCount > 0 ? totalSoc / pcsCount : 0;
+
+    // PCS Fleet total power (same devices, same active power)
+    const pcsTotalMW = batteryPowerMW;
+
+    // Efficiency: (PCS output / Battery input) * 100
+    // When battery is charging (negative power) or zero, show 0
+    const efficiency =
+      Math.abs(batteryPowerMW) > 0
+        ? Math.min((Math.abs(pcsTotalMW) / Math.abs(batteryPowerMW)) * 100, 100)
+        : 0;
+
+    // POI / Grid
+    let totalGridPowerKW = 0;
+    let totalFreq = 0;
+    let totalVolt = 0;
+    let poiCount = 0;
+
+    if (poiData && poiData.length > 0) {
+      for (const row of poiData) {
+        totalGridPowerKW += safeNum(row.power_kw);
+        totalFreq += safeNum(row.frequency_hz);
+        totalVolt += safeNum(row.voltage);
+        poiCount++;
+      }
+    }
+
+    const gridPowerMW = totalGridPowerKW / 1000;
+    const avgFreqHz = poiCount > 0 ? totalFreq / poiCount : 0;
+    const avgVoltKV = poiCount > 0 ? totalVolt / poiCount / 1000 : 0; // V -> kV
+
+    return {
+      batteryPowerMW,
+      avgSoc,
+      pcsTotalMW,
+      efficiency,
+      gridPowerMW,
+      avgFreqHz,
+      avgVoltKV,
+    };
+  }, [pcsData, poiData]);
+
+  const pcsLoading = pcsStatus === "loading" || pcsStatus === "idle";
+  const poiLoading = poiStatus === "loading" || poiStatus === "idle";
 
   return (
     <Box
@@ -382,9 +472,9 @@ const PCSPowerFlowOverview = () => {
       <Flex align="center">
         <FlowCard
           title="Battery"
-          value="26.05 MW"
+          value={pcsLoading ? "-- MW" : fmt(batteryPowerMW, "MW")}
           label="SOC"
-          subValue="56.2 %"
+          subValue={pcsLoading ? "-- %" : `${avgSoc.toFixed(1)} %`}
           icon={<BatteryIcon />}
           inlineBottom
         />
@@ -393,9 +483,9 @@ const PCSPowerFlowOverview = () => {
 
         <FlowCard
           title="PCS Fleet"
-          value="25.40 MW"
+          value={pcsLoading ? "-- MW" : fmt(pcsTotalMW, "MW")}
           label="Efficiency"
-          subValue="97.85 %"
+          subValue={pcsLoading ? "-- %" : `${efficiency.toFixed(2)} %`}
           icon={<PCSIcon />}
           inlineBottom
         />
@@ -404,9 +494,9 @@ const PCSPowerFlowOverview = () => {
 
         <FlowCard
           title="PCC / Grid"
-          value="25.38 MW"
-          label="50.02 Hz"
-          subValue="33.01 kV"
+          value={poiLoading ? "-- MW" : fmt(gridPowerMW, "MW")}
+          label={poiLoading ? "-- Hz" : `${avgFreqHz.toFixed(2)} Hz`}
+          subValue={poiLoading ? "-- kV" : `${avgVoltKV.toFixed(2)} kV`}
           icon={<GridIcon />}
         />
       </Flex>
