@@ -103,6 +103,7 @@ const SplineGraph = forwardRef<any, SplineGraphProps>(
       }[] = [];
 
       (apiData || []).forEach((series: any) => {
+        const pointInterval = Math.max(60000, Number(series.pointInterval) || 60000);
         const points = Array.isArray(series?.data)
           ? series.data
               .filter(
@@ -133,11 +134,11 @@ const SplineGraph = forwardRef<any, SplineGraphProps>(
             if (Number.isFinite(prevTs) && Number.isFinite(ts)) {
               const gap = ts - prevTs;
 
-              if (gap > 60000) {
+              if (gap > pointInterval) {
                 for (
-                  let missingTs = prevTs + 60000;
+                  let missingTs = prevTs + pointInterval;
                   missingTs < ts;
-                  missingTs += 60000
+                  missingTs += pointInterval
                 ) {
                   missing.push({
                     ts: missingTs,
@@ -364,6 +365,9 @@ const SplineGraph = forwardRef<any, SplineGraphProps>(
             color:
               xAxisProps.labels?.style?.color || axisColor,
             formatter: (value: number) => {
+              if (typeof xAxisProps.labels?.formatter === "function") {
+                return xAxisProps.labels.formatter.call({ value });
+              }
               return echarts.time.format(value, "{HH}:{mm}", true);
             },
           },

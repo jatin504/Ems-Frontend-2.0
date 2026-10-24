@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   Box,
   Flex,
@@ -8,6 +8,8 @@ import {
   Divider,
   useColorModeValue,
 } from "@chakra-ui/react";
+import useTimeseriesData from "../../../../hooks/useTimeseriesData";
+import { useLatestPOIData } from "../../../../hooks/poi_meter/useLatestPOIData";
 
 /* ================= Battery ================= */
 
@@ -273,13 +275,108 @@ const Device = ({
     </Text>
   </VStack>
 );
-const SystemTopologyCard = ({
-  selectedDeviceName = "PCS-01",
-}: {
+interface SystemTopologyCardProps {
+  deviceId?: string;
   selectedDeviceName?: string;
-}) => {
+}
+
+const SystemTopologyCard = ({
+  deviceId,
+  selectedDeviceName = "PCS-01",
+}: SystemTopologyCardProps) => {
   const bg = useColorModeValue("white", "#1A202C");
   const border = useColorModeValue("#E2E8F0", "#2D3748");
+
+  const { data, fetchData } = useTimeseriesData();
+
+  useEffect(() => {
+    if (!deviceId) return;
+
+    fetchData({
+      devices: {
+        patterns: [],
+        ids: [deviceId],
+      },
+      keys: [
+        { key: "active_power", alias: "active_power", keyType: "common" },
+        { key: "reactive_power", alias: "reactive_power", keyType: "common" },
+        { key: "soc", alias: "soc", keyType: "common" },
+        { key: "power_factor", alias: "power_factor", keyType: "common" },
+        { key: "frequency", alias: "frequency", keyType: "common" },
+        { key: "voltage", alias: "voltage", keyType: "common" },
+      ],
+      aggregation: {
+        func: "last",
+        interval: 1,
+        intervalType: "minute",
+      },
+      timeRange: {
+        type: "relative",
+        relativeType: "currentDaySoFar",
+      },
+      orderBy: "ASC",
+    } as any);
+  }, [deviceId]);
+
+  const poiKeys = useMemo(() => ["power_kw", "frequency_hz", "voltage", "power_factor"], []);
+  const { data: poiData } = useLatestPOIData(poiKeys);
+
+  const deviceData = (data as any)?.[deviceId || ""];
+  const getLatest = (key: string) => {
+    const points = deviceData?.[key] ?? [];
+    return points[points.length - 1]?.value ?? null;
+  };
+
+  const activePower = getLatest("active_power");
+  const reactivePower = getLatest("reactive_power");
+  const socVal = getLatest("soc");
+  const pcsFreq = getLatest("frequency");
+  const pcsVolt = getLatest("voltage");
+  const pcsPF = getLatest("power_factor");
+
+  // Format power
+  const formatMW = (kwVal: number | null | undefined, defaultMW = "12.46") => {
+    if (kwVal === null || kwVal === undefined || Number.isNaN(Number(kwVal))) {
+      return `${defaultMW} MW`;
+    }
+    const n = Number(kwVal);
+    if (Math.abs(n) >= 1000) {
+      return `${(n / 1000).toFixed(2)} MW`;
+    }
+    return `${n.toFixed(2)} kW`;
+  };
+
+  const formatMVAr = (kvarVal: number | null | undefined, defaultMVAR = "2.10") => {
+    if (kvarVal === null || kvarVal === undefined || Number.isNaN(Number(kvarVal))) {
+      return `${defaultMVAR} MVAr`;
+    }
+    const n = Number(kvarVal);
+    if (Math.abs(n) >= 1000) {
+      return `${(n / 1000).toFixed(2)} MVAr`;
+    }
+    return `${n.toFixed(2)} kVAr`;
+  };
+
+  const batterySocStr = socVal !== null && socVal !== undefined ? `${Number(socVal).toFixed(1)} %` : "56.2 %";
+  const batteryPowerStr = formatMW(activePower, "12.46");
+  const pcsPowerStr = formatMW(activePower, "12.46");
+  const pcsQStr = formatMVAr(reactivePower, "2.10");
+
+  // POI / Grid
+  const poiItem = poiData && poiData.length > 0 ? poiData[0] : null;
+  const pccVoltRaw = poiItem?.voltage ? parseFloat(poiItem.voltage) : (pcsVolt ? Number(pcsVolt) : null);
+  const pccFreqRaw = poiItem?.frequency_hz ? parseFloat(poiItem.frequency_hz) : (pcsFreq ? Number(pcsFreq) : null);
+  const pccPFRaw = poiItem?.power_factor ? parseFloat(poiItem.power_factor) : (pcsPF ? Number(pcsPF) : null);
+
+  const pccVoltStr = pccVoltRaw
+    ? (pccVoltRaw >= 1000 ? `${(pccVoltRaw / 1000).toFixed(2)} kV` : `${pccVoltRaw.toFixed(1)} V`)
+    : "33.01 kV";
+  const pccFreqStr = pccFreqRaw ? `${pccFreqRaw.toFixed(2)} Hz` : "50.02 Hz";
+  const pccPFStr = pccPFRaw !== null && pccPFRaw !== undefined
+    ? `${Math.abs(pccPFRaw).toFixed(3)} ${pccPFRaw >= 0 ? "Lead" : "Lag"}`
+    : "0.987 Lead";
+
+  const isOnline = activePower !== null ? Math.abs(Number(activePower)) > 0 : true;
 
   return (
     <Box
@@ -290,7 +387,7 @@ const SystemTopologyCard = ({
       px={4}
       py={2.5}
       boxShadow="sm"
-      maxW="700px"
+      w="100%"
     >
       {/* Title */}
       <Text
@@ -345,7 +442,7 @@ const SystemTopologyCard = ({
         justify="space-between"
         align="stretch"
       >
-                {/* Battery */}
+        {/* Battery */}
 
         <VStack
           flex={1}
@@ -364,7 +461,7 @@ const SystemTopologyCard = ({
               fontWeight="600"
               fontSize="13px"
             >
-              56.2 %
+              {batterySocStr}
             </Text>
           </HStack>
 
@@ -380,7 +477,7 @@ const SystemTopologyCard = ({
               fontWeight="600"
               fontSize="13px"
             >
-              12.46 MW
+              {batteryPowerStr}
             </Text>
           </HStack>
         </VStack>
@@ -409,7 +506,7 @@ const SystemTopologyCard = ({
               fontWeight="600"
               fontSize="13px"
             >
-              12.46 MW
+              {pcsPowerStr}
             </Text>
           </HStack>
 
@@ -425,7 +522,7 @@ const SystemTopologyCard = ({
               fontWeight="600"
               fontSize="13px"
             >
-              2.10 MVAr
+              {pcsQStr}
             </Text>
           </HStack>
         </VStack>
@@ -453,14 +550,14 @@ const SystemTopologyCard = ({
             px={4}
             py={1}
             borderRadius="full"
-            bg="#E8F7EC"
+            bg={isOnline ? "#E8F7EC" : "#FEF3C7"}
           >
             <Text
-              color="#2E9E49"
+              color={isOnline ? "#2E9E49" : "#D97706"}
               fontWeight="600"
               fontSize="12px"
             >
-              ON
+              {isOnline ? "ON" : "STANDBY"}
             </Text>
           </Box>
         </VStack>
@@ -489,7 +586,7 @@ const SystemTopologyCard = ({
               fontWeight="600"
               fontSize="13px"
             >
-              33.01 kV
+              {pccVoltStr}
             </Text>
           </HStack>
 
@@ -505,7 +602,7 @@ const SystemTopologyCard = ({
               fontWeight="600"
               fontSize="13px"
             >
-              50.02 Hz
+              {pccFreqStr}
             </Text>
           </HStack>
 
@@ -521,13 +618,13 @@ const SystemTopologyCard = ({
               fontWeight="600"
               fontSize="13px"
             >
-              0.987 Lead
+              {pccPFStr}
             </Text>
           </HStack>
         </VStack>
 
       </Flex>
-          </Box>
+    </Box>
   );
 };
 

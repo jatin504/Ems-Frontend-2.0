@@ -93,7 +93,7 @@ const AlarmEventsCard = ({
         padding: "14px",
 
         height: "310px",
-        width: "430px",
+        width: "100%",
 
         overflow: "hidden",
 

@@ -1,6 +1,6 @@
 // src/pages/AlarmLatest.tsx
-import React from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useCallback, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
   Heading,
@@ -26,7 +26,7 @@ import {
   BreadcrumbLink,
   Select,
 } from "@chakra-ui/react";
-import { ChevronRightIcon } from "@chakra-ui/icons";
+import { ChevronRightIcon, CloseIcon } from "@chakra-ui/icons";
 import DashboardLayout from "../layouts/DashboardLayout";
 import {
   useAlarmLatest,
@@ -57,6 +57,11 @@ function downloadCSV(rows: any[], filename: string) {
 
 const AlarmLatest: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromPCSSummary = (location.state as { fromPCSAlarmSummary?: boolean } | null)?.fromPCSAlarmSummary === true;
+  const closePCSSummary = useCallback(() => {
+    navigate("/devices/pcs", { replace: true });
+  }, [navigate]);
 
   const {
     rows,
@@ -80,6 +85,21 @@ const AlarmLatest: React.FC = () => {
     setSearchInput,
     handleSearch,
   } = useAlarmLatest();
+
+  useEffect(() => {
+    if (!fromPCSSummary) return;
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (activePopover !== null) {
+        setActivePopover(null);
+        return;
+      }
+      event.preventDefault();
+      closePCSSummary();
+    };
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [fromPCSSummary, closePCSSummary, activePopover, setActivePopover]);
 
   const bgColor = useColorModeValue("gray.100", "gray.900");
   const textColor = useColorModeValue("black", "white");
@@ -122,6 +142,17 @@ const AlarmLatest: React.FC = () => {
           mt={5}
           spacing={3}
         >
+          {fromPCSSummary && (
+            <Button
+              size="sm"
+              mr="auto"
+              leftIcon={<CloseIcon boxSize={2.5} />}
+              aria-label="Close alarms and return to PCS"
+              onClick={closePCSSummary}
+            >
+              Back to PCS
+            </Button>
+          )}
           <Input
             size="sm"
             width="280px"

@@ -176,19 +176,18 @@ const GraphLayout: React.FC<GraphLayoutProps> = ({
   //     setIsFullscreen(false); // Exited fullscreen
   //   }
   // };
-  const handleFullscreenChange = () => {
-    const full = !!document.fullscreenElement;
-    setIsFullscreen(full);
-    onFullscreenChange?.(full);
-  };
-
   // Add event listener for fullscreen change
   useEffect(() => {
+    const handleFullscreenChange = () => {
+      const full = document.fullscreenElement === GraphLayoutRef.current;
+      setIsFullscreen(full);
+      onFullscreenChange?.(full);
+    };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
-  }, []);
+  }, [onFullscreenChange]);
 
   // Interval Selection
   const [currentInterval, setCurrentInterval] =
@@ -207,7 +206,7 @@ const GraphLayout: React.FC<GraphLayoutProps> = ({
     <Box
       ref={GraphLayoutRef}
       position="relative"
-      w={isFullscreen ? '1900px' : width}
+      w={isFullscreen ? '100vw' : width}
       h={isFullscreen ? '100vh' : height}
       borderRadius="8px"
       border={border}
