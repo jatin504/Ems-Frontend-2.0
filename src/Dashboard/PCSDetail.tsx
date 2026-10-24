@@ -195,7 +195,7 @@ const PCSDetail = () => {
 
             <EnergyCountersCard />
 
-            <ThermalStatusCard />
+            <ThermalStatusCard deviceId={selectedDeviceConfig?.deviceId || selectedDeviceKey} />
           </Grid>
 
           </VStack>
@@ -204,21 +204,28 @@ const PCSDetail = () => {
       {/* Last Row Full Width */}
       <Grid
         mt={4}
-        templateColumns="1.6fr 1fr 1fr 1fr"
+        templateColumns={{ base: "1fr", lg: "1.35fr 1fr 1.05fr 0.95fr" }}
         gap={4}
         alignItems="stretch"
       >
-        <Box gridColumn="span 1">
-          <SystemTopologyCard selectedDeviceName={selectedDeviceConfig?.name || selectedDeviceKey} />
+        <Box minW="0">
+          <SystemTopologyCard
+            deviceId={selectedDeviceConfig?.deviceId || selectedDeviceKey}
+            selectedDeviceName={selectedDeviceConfig?.name || selectedDeviceKey}
+          />
         </Box>
 
-        <AlarmEventsCard />
+        <Box minW="0">
+          <AlarmEventsCard deviceId={selectedDeviceConfig?.deviceId || selectedDeviceKey} />
+        </Box>
 
-        <Box mt={-5}>
+        <Box minW="0" mt={-5}>
           <HarmonicAnalysisCard deviceId={selectedDeviceConfig?.deviceId || selectedDeviceKey} />
         </Box>
 
-        <ComplianceProtectionCard />
+        <Box minW="0">
+          <ComplianceProtectionCard deviceId={selectedDeviceConfig?.deviceId || selectedDeviceKey} />
+        </Box>
       </Grid>
     </Box>
   );
